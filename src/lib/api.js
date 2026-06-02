@@ -337,3 +337,15 @@ export function subscribeShifts(cb) {
     .subscribe()
   return () => supabase.removeChannel(ch)
 }
+
+// Generic patch for a territory (assign rep, set houses, etc.)
+export async function updateTerritory(id, patch) {
+  if (HAS_BACKEND) {
+    const { data } = await supabase.from('territories').update(patch).eq('id', id).select().single()
+    return data
+  }
+  const db = loadDB()
+  const t = db.territories.find((x) => x.id === id)
+  if (t) { Object.assign(t, patch); saveDB(db) }
+  return t
+}

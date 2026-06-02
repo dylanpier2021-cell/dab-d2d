@@ -78,7 +78,7 @@ export default function Schedule() {
     .sort((a, b) => (a.shift_date + a.start_time).localeCompare(b.shift_date + b.start_time))
 
   return (
-    <Layout title="Schedule" subtitle={view === 'jobs' ? 'Open & booked times' : "Who's rolling out"}>
+    <Layout title="Schedule" subtitle={view === 'jobs' ? 'Is there room to book?' : "Who's rolling out"}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
         <button className={'pill ' + (view === 'jobs' ? 'pill-green' : 'pill-dim')} onClick={() => setView('jobs')}>Job calendar</button>
         <button className={'pill ' + (view === 'crew' ? 'pill-green' : 'pill-dim')} onClick={() => setView('crew')}>Crew shifts</button>
@@ -87,12 +87,18 @@ export default function Schedule() {
       {view === 'jobs' && (
         CAL_URL ? (
           <div className="card" style={{ padding: 6 }}>
+            <div className="helper" style={{ padding: '6px 8px 10px' }}>
+              Closed a job at the door? Check here for an open time and book it in. Greyed-out
+              slots are taken — already-booked jobs or blocked-off hours. Open slots are free.
+            </div>
             <iframe
               src={CAL_URL}
               title="Job booking calendar"
               style={{ width: '100%', height: 760, border: 'none', borderRadius: 10, background: '#fff' }}
             />
-            <div className="helper" style={{ padding: '8px 8px 2px' }}>Grey/blocked = already booked. Pick an open slot to book a job.</div>
+            <div className="helper" style={{ padding: '8px 8px 2px' }}>
+              Crew set their own availability and jobs in GoHighLevel — blocked time shows up here automatically.
+            </div>
           </div>
         ) : (
           <div className="card"><div className="empty">Job calendar isn’t connected yet.</div></div>

@@ -3,7 +3,7 @@ import Layout from '../components/Layout.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import {
   getTerritories, getUsers, getTeams, getKnocks, saveKnock, subscribeKnocks,
-  createTerritory, assignTerritory, deleteTerritory,
+  createTerritory, updateTerritory, deleteTerritory,
 } from '../lib/api.js'
 
 const STATUSES = [
@@ -18,7 +18,6 @@ const meta = Object.fromEntries(STATUSES.map((s) => [s.key, s]))
 
 const LS_KEY = 'dab_knocks_v1'
 const writeLocal = (rows) => { try { localStorage.setItem(LS_KEY, JSON.stringify(rows)) } catch {} }
-const housesFor = () => Array.from({ length: 10 }, (_, i) => `${100 + i * 2}`)
 const addrKey = (street, house) => `${street} #${house}`
 const indexBy = (rows) => { const o = {}; for (const r of rows || []) o[r.address] = r; return o }
 const teamName = (teams, id) => teams.find((t) => t.id === id)?.name || 'Unassigned'
@@ -30,8 +29,9 @@ export default function Territory() {
   const [teams, setTeams] = useState([])
   const [knocks, setKnocks] = useState({})
   const [active, setActive] = useState(null)
-  const [tab, setTab] = useState('map')        // map | assign
+  const [tab, setTab] = useState('map')
   const [form, setForm] = useState({ neighborhood: '', street: '', assigned_team_id: '' })
+  const [houseInput, setHouseInput] = useState({})   // {territoryId: "text"}
 
   const reloadTerr = () => getTerritories().then((t) => { setTerr(t); setActive((a) => a || t[0]?.id || null) })
 
@@ -46,6 +46,12 @@ export default function Territory() {
 
   const canAssign = isAdmin || user.role === 'sub_manager'
   const nameOf = (id) => users.find((u) => u.id === id)?.name?.split(' ')[0] || ''
+  const repsOfTeam = (teamId) => users.filter((u) => u.role === 'rep' && u.team_id === teamId)
+  // can the current user hand THIS street to a rep / edit its houses?
+  const canManageStreet = (t) =>
+    isAdmin ||
+    (teams.find((tm) => tm.id === t.assigned_team_id)?.sub_manager_id === user.id) ||
+    (user.role === 'sub_manager' && t.assigned_team_id === user.team_id)
 
   const cycle = async (territory, house) => {
     const address = addrKey(territory.street, house)
@@ -57,7 +63,7 @@ export default function Territory() {
     await saveKnock(row)
   }
 
-  // scope of streets this user can SEE
+  // streets this user can SEE on the map
   const visible = terr.filter((t) => {
     if (isAdmin) return true
     if (user.role === 'sub_manager') return t.assigned_team_id === user.team_id
@@ -65,15 +71,26 @@ export default function Territory() {
   })
   const cur = visible.find((t) => t.id === active) || visible[0]
 
-  // ----- assignment helpers -----
-  const myTeamReps = users.filter((u) => u.role === 'rep' && u.team_id === user.team_id)
+  // ----- assignment -----
   const addStreet = async () => {
     if (!form.street) return
-    await createTerritory({ neighborhood: form.neighborhood || 'Neighborhood', street: form.street, assigned_team_id: form.assigned_team_id || (user.role === 'sub_manager' ? user.team_id : null) })
+    const team_id = isAdmin ? (form.assigned_team_id || null) : user.team_id
+    await createTerritory({ neighborhood: form.neighborhood || 'Neighborhood', street: form.street, assigned_team_id: team_id, houses: [] })
     setForm({ neighborhood: form.neighborhood, street: '', assigned_team_id: form.assigned_team_id })
     reloadTerr()
   }
-  // which streets show in the assign tab
+  const addHouse = async (t) => {
+    const val = (houseInput[t.id] || '').trim()
+    if (!val) return
+    const houses = Array.from(new Set([...(t.houses || []), val]))
+    await updateTerritory(t.id, { houses })
+    setHouseInput((p) => ({ ...p, [t.id]: '' }))
+    reloadTerr()
+  }
+  const removeHouse = async (t, h) => {
+    await updateTerritory(t.id, { houses: (t.houses || []).filter((x) => x !== h) })
+    reloadTerr()
+  }
   const assignable = isAdmin ? terr : terr.filter((t) => t.assigned_team_id === user.team_id)
 
   return (
@@ -89,8 +106,8 @@ export default function Territory() {
         <>
           <div className="card">
             <div className="card-title">{isAdmin ? 'Add a street to a team' : 'Add a street for my team'}</div>
-            <div className="field"><label>Neighborhood</label><input className="input" value={form.neighborhood} onChange={(e) => setForm({ ...form, neighborhood: e.target.value })} placeholder="Maple Heights" /></div>
-            <div className="field"><label>Street</label><input className="input" value={form.street} onChange={(e) => setForm({ ...form, street: e.target.value })} placeholder="Maple St" /></div>
+            <div className="field"><label>Neighborhood</label><input className="input" value={form.neighborhood} onChange={(e) => setForm({ ...form, neighborhood: e.target.value })} placeholder="e.g. Westside" /></div>
+            <div className="field"><label>Street</label><input className="input" value={form.street} onChange={(e) => setForm({ ...form, street: e.target.value })} placeholder="e.g. Elm St" /></div>
             {isAdmin && (
               <div className="field">
                 <label>Assign to team</label>
@@ -104,26 +121,49 @@ export default function Territory() {
           </div>
 
           <div className="section-label">{isAdmin ? 'All streets' : 'My team’s streets'}</div>
-          <div className="card">
-            {assignable.length === 0 && <div className="empty">No streets yet.</div>}
-            {assignable.map((t) => (
-              <div className="row" key={t.id} style={{ alignItems: 'flex-start' }}>
-                <div className="grow">
-                  <div className="name">{t.street}</div>
-                  <div className="meta">{t.neighborhood} · {teamName(teams, t.assigned_team_id)}</div>
-                  {/* team leaders + admins hand a street to a specific rep */}
-                  {(user.role === 'sub_manager' && t.assigned_team_id === user.team_id) && (
-                    <select className="input" style={{ marginTop: 8 }} value={t.assigned_rep_id || ''} onChange={async (e) => { await assignTerritory(t.id, e.target.value || null); reloadTerr() }}>
-                      <option value="">Whole team</option>
-                      {myTeamReps.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-                    </select>
-                  )}
-                  {t.assigned_rep_id && user.role !== 'sub_manager' && <div className="meta" style={{ marginTop: 4 }}>Rep: {nameOf(t.assigned_rep_id)}</div>}
+          {assignable.length === 0 && <div className="card"><div className="empty">No streets yet. Add one above.</div></div>}
+          {assignable.map((t) => {
+            const manage = canManageStreet(t)
+            return (
+              <div className="card" key={t.id}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div className="name">{t.street}</div>
+                    <div className="meta">{t.neighborhood} · {teamName(teams, t.assigned_team_id)}</div>
+                  </div>
+                  {isAdmin && <button className="btn-ghost btn-danger" style={{ fontSize: 12 }} onClick={async () => { await deleteTerritory(t.id); reloadTerr() }}>remove</button>}
                 </div>
-                {isAdmin && <button className="btn-ghost btn-danger" style={{ fontSize: 12 }} onClick={async () => { await deleteTerritory(t.id); reloadTerr() }}>remove</button>}
+
+                {/* hand the street to a specific rep on that team */}
+                {manage && (
+                  <div className="field" style={{ marginTop: 10, marginBottom: 6 }}>
+                    <label>Give this street to</label>
+                    <select className="input" value={t.assigned_rep_id || ''} onChange={async (e) => { await updateTerritory(t.id, { assigned_rep_id: e.target.value || null }); reloadTerr() }}>
+                      <option value="">Whole team</option>
+                      {repsOfTeam(t.assigned_team_id).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {/* real houses on this street */}
+                {manage && (
+                  <div style={{ marginTop: 6 }}>
+                    <label className="meta">Houses on this street</label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '6px 0' }}>
+                      {(t.houses || []).length === 0 && <span className="meta">None yet.</span>}
+                      {(t.houses || []).map((h) => (
+                        <span key={h} className="pill pill-dim">{h}<button onClick={() => removeHouse(t, h)} style={{ background: 'none', border: 'none', color: 'var(--dab-danger)', cursor: 'pointer', marginLeft: 4 }}>×</button></span>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input className="input" value={houseInput[t.id] || ''} onChange={(e) => setHouseInput((p) => ({ ...p, [t.id]: e.target.value }))} onKeyDown={(e) => e.key === 'Enter' && addHouse(t)} placeholder="House # or address" />
+                      <button className="btn" onClick={() => addHouse(t)}>Add</button>
+                    </div>
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
+            )
+          })}
         </>
       )}
 
@@ -140,18 +180,22 @@ export default function Territory() {
               {cur && (
                 <div className="card">
                   <div className="card-title">{cur.neighborhood} · {cur.street}</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-                    {housesFor().map((h) => {
-                      const k = knocks[addrKey(cur.street, h)]
-                      const m = meta[k?.status || 'not_knocked']
-                      const by = k?.rep_id ? nameOf(k.rep_id) : ''
-                      return (
-                        <button key={h} onClick={() => cycle(cur, h)} style={{ aspectRatio: '1', borderRadius: 10, background: m.color, color: m.text, fontSize: 12, fontWeight: 600, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(0,0,0,0.15)' }}>
-                          {h}{by && <span style={{ fontSize: 8, fontWeight: 500, marginTop: 2 }}>{by}</span>}
-                        </button>
-                      )
-                    })}
-                  </div>
+                  {(cur.houses || []).length === 0 ? (
+                    <div className="empty">No houses on this street yet. {canManageStreet(cur) ? 'Add them in the Assign tab.' : 'Ask your team leader to add them.'}</div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                      {(cur.houses || []).map((h) => {
+                        const k = knocks[addrKey(cur.street, h)]
+                        const m = meta[k?.status || 'not_knocked']
+                        const by = k?.rep_id ? nameOf(k.rep_id) : ''
+                        return (
+                          <button key={h} onClick={() => cycle(cur, h)} style={{ aspectRatio: '1', borderRadius: 10, background: m.color, color: m.text, fontSize: 12, fontWeight: 600, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(0,0,0,0.15)' }}>
+                            {h}{by && <span style={{ fontSize: 8, fontWeight: 500, marginTop: 2 }}>{by}</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
                   <div className="helper" style={{ marginTop: 10 }}>Tap a house to log a knock. Status syncs to the whole team instantly.</div>
                 </div>
               )}

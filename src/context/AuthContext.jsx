@@ -8,10 +8,9 @@ export const useAuth = () => useContext(AuthCtx)
 const MOCK_SESSION_KEY = 'dab_mock_session_user'
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)   // the profile row (with role)
+  const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // ---- MOCK MODE: auto-sign-in as Dylan (owner) -----------------------------
   const loadMockUser = useCallback(() => {
     const db = loadDB()
     const savedId = localStorage.getItem(MOCK_SESSION_KEY)
@@ -25,19 +24,31 @@ export function AuthProvider({ children }) {
       loadMockUser()
       return
     }
-    // ---- REAL MODE: hydrate from Supabase session ---------------------------
     let active = true
+    const done = () => { if (active) setLoading(false) }
+
     async function hydrate(session) {
-      if (!session?.user) {
-        if (active) { setUser(null); setLoading(false) }
-        return
+      try {
+        if (!session?.user) { if (active) setUser(null); return }
+        const { data } = await supabase.from('users').select('*').eq('id', session.user.id).maybeSingle()
+        if (active) setUser(data || null)
+      } catch (e) {
+        if (active) setUser(null)
+      } finally {
+        done()
       }
-      const { data } = await supabase.from('users').select('*').eq('id', session.user.id).single()
-      if (active) { setUser(data || null); setLoading(false) }
     }
-    supabase.auth.getSession().then(({ data }) => hydrate(data.session))
+
+    supabase.auth.getSession()
+      .then(({ data }) => hydrate(data.session))
+      .catch(() => done())
+
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => hydrate(session))
-    return () => { active = false; sub.subscription.unsubscribe() }
+
+    // Safety net: never let the app hang on the loading screen.
+    const t = setTimeout(done, 6000)
+
+    return () => { active = false; clearTimeout(t); sub.subscription.unsubscribe() }
   }, [loadMockUser])
 
   const signIn = async (email, password) => {
@@ -53,7 +64,6 @@ export function AuthProvider({ children }) {
     return { error: error?.message || null }
   }
 
-  // Mock-mode helper: jump into any role to test what they see.
   const switchMockUser = (id) => {
     if (HAS_BACKEND) return
     const db = loadDB()
@@ -64,7 +74,6 @@ export function AuthProvider({ children }) {
   const signOut = async () => {
     if (!HAS_BACKEND) {
       localStorage.removeItem(MOCK_SESSION_KEY)
-      // in mock mode there's no real logout target; drop back to Dylan
       loadMockUser()
       return
     }
