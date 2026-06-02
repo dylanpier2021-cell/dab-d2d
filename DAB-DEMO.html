@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>DAB Sales Hub — Demo</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;}
+  body{background:#0a1410;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:24px 12px;color:#eaf3ee;}
+  .hint{color:#9bb3a7;font-size:13px;margin-bottom:16px;text-align:center;max-width:360px;line-height:1.5;}
+  .phone{width:360px;max-width:100%;background:#0f1c17;border-radius:26px;border:1px solid #284536;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+  .top{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #284536;background:rgba(15,28,23,.96);}
+  .top .mk{font-size:17px;font-weight:600;} .dot{color:#4ade80;}
+  .top .sub{font-size:11px;color:#9bb3a7;margin-top:1px;}
+  select{background:#1d3329;color:#eaf3ee;border:1px solid #284536;border-radius:8px;font-size:11px;padding:7px 9px;}
+  #screen{padding:15px;min-height:460px;}
+  .nav-wrap{display:flex;justify-content:space-around;border-top:1px solid #284536;padding:9px 4px 12px;background:rgba(15,28,23,.96);}
+  .nav{background:none;border:none;color:#6f8a7d;font-size:11px;font-weight:600;padding:5px 8px;cursor:pointer;flex:1;}
+  .nav.on{color:#4ade80;}
+  .dcard{background:#16261f;border:1px solid #284536;border-radius:12px;padding:14px;margin-bottom:11px;}
+  .dlabel{font-size:11px;color:#9bb3a7;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px;}
+  .stat{background:#16261f;border:1px solid #284536;border-radius:10px;padding:12px;}
+  .stat .l{font-size:11px;color:#9bb3a7;} .stat .v{font-size:21px;font-weight:600;margin-top:3px;} .stat .v.a{color:#4ade80;}
+  .drow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #284536;}
+  .drow:last-child{border-bottom:none;}
+  .av{width:34px;height:34px;border-radius:50%;background:#1d3329;color:#4ade80;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0;}
+  .nm{font-size:14px;font-weight:500;} .mt{font-size:11px;color:#9bb3a7;margin-top:1px;} .amt{font-size:14px;font-weight:600;color:#4ade80;margin-left:auto;}
+  .pbtn{font-size:12px;font-weight:600;padding:7px 12px;border-radius:999px;border:none;cursor:pointer;background:#1d3329;color:#9bb3a7;}
+  .pbtn.on{background:rgba(74,222,128,.16);color:#4ade80;}
+  .gbtn{width:100%;padding:14px;border-radius:11px;font-size:15px;font-weight:600;background:#4ade80;color:#06231a;border:none;cursor:pointer;}
+  .gbtn:disabled{opacity:.45;}
+  .lbtn{width:100%;display:flex;justify-content:space-between;align-items:center;padding:12px 13px;border-radius:10px;background:#1d3329;border:1px solid #284536;color:#eaf3ee;cursor:pointer;font-size:13px;font-weight:500;text-align:left;margin-bottom:8px;}
+  .rank{width:22px;text-align:center;font-weight:700;color:#9bb3a7;flex-shrink:0;} .rank.t{color:#4ade80;}
+  .house{aspect-ratio:1;border-radius:10px;font-size:12px;font-weight:600;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid rgba(0,0,0,.2);cursor:pointer;}
+  .warn{font-size:12px;color:#FAC775;background:rgba(250,199,117,.1);border:1px solid rgba(250,199,117,.25);border-radius:10px;padding:10px 12px;margin-bottom:12px;}
+  input.f{width:100%;padding:12px;background:#0f1c17;border:1px solid #284536;border-radius:10px;color:#eaf3ee;font-size:15px;margin-top:6px;}
+  .fl{font-size:12px;color:#9bb3a7;}
+</style>
+</head>
+<body>
+<div class="hint">DAB Sales Hub — interactive demo. Switch roles (top-right), run the quote calculator, log a job, check ranks, and tap houses on the map.</div>
+<div class="phone">
+  <div class="top">
+    <div><div class="mk">DAB<span class="dot">.</span></div><div class="sub" id="sub">Good morning, Mike</div></div>
+    <select id="role">
+      <option value="rep">Mike · Rep</option>
+      <option value="leader">Dom · Team Leader</option>
+      <option value="owner">Dylan · Owner</option>
+    </select>
+  </div>
+  <div id="screen"></div>
+  <div class="nav-wrap">
+    <button class="nav" data-s="home">Home</button>
+    <button class="nav" data-s="log">Log Job</button>
+    <button class="nav" data-s="ranks">Ranks</button>
+    <button class="nav" data-s="map">Map</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var S=document.getElementById('screen'),SUB=document.getElementById('sub'),ROLE=document.getElementById('role');
+  var screen='home',role='rep';
+  var greet={rep:'Good morning, Mike',leader:'Good morning, Dom',owner:'Good morning, Dylan'};
+  var pricing={
+    'House Wash':[['Small 1-story (1,000-1,500)',269],['Large 1-story (1,500-2,000)',334],['Small 2-story (2,000-2,800)',409],['Large 2-story (2,800+)',499]],
+    'Driveway':[['1-car (300-500)',179],['2-car (500-800)',219],['3-car (800-1,200)',289]],
+    'Patio':[['Small (100-200)',114],['Medium (200-400)',164],['Large (400-700)',224]],
+    'Windows':[['Small / 2-panel ×4',20],['Medium / 4-panel ×4',28],['Large / bay ×2',20]]
+  };
+  var svc='House Wash',job=[],lastWin=null,cust='';
+  var board=[{n:'Mike',r:'Rep',rev:519,cl:2},{n:'Sara',r:'Rep',rev:573,cl:2},{n:'Dom',r:'Team Leader',rev:499,cl:1},{n:'Leo',r:'Rep',rev:403,cl:2},{n:'Nina',r:'Rep',rev:269,cl:1}];
+  var knock={},korder=['nk','na','ni','fu','cl'];
+  var kmeta={nk:['#3a4f44','#9bb3a7'],na:['#FAC775','#412402'],ni:['#F09595','#501313'],fu:['#85B7EB','#042C53'],cl:['#4ade80','#06231a']};
+  function money(n){return '$'+(Math.round(n*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+  function m0(n){return '$'+Math.round(n).toLocaleString('en-US');}
+  function ini(n){return n.split(' ').map(function(w){return w[0]}).join('').slice(0,2).toUpperCase();}
+  function setNav(){document.querySelectorAll('.nav').forEach(function(b){b.classList.toggle('on',b.dataset.s===screen);});}
+  function grid(a){return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+a.map(function(s){return '<div class="stat"><div class="l">'+s[0]+'</div><div class="v'+(s[2]?' a':'')+'">'+s[1]+'</div></div>';}).join('')+'</div>';}
+  function rowHtml(n,m,a){return '<div class="drow"><div><div class="nm">'+n+'</div><div class="mt">'+m+'</div></div><div class="amt">'+a+'</div></div>';}
+  function repRow(n,m,a){return '<div class="drow"><div class="av">'+ini(n)+'</div><div><div class="nm">'+n+'</div><div class="mt">'+m+'</div></div><div class="amt">'+a+'</div></div>';}
+
+  function render(){setNav();SUB.textContent=greet[role];if(screen==='home')return home();if(screen==='log')return lastWin?win():log();if(screen==='ranks')return ranks();if(screen==='map')return map();}
+  function home(){
+    if(role==='owner'){
+      S.innerHTML=grid([['Company rev (wk)','$2,263',0],['Closes','8',0],['Commission owed','$248',1],['Net after comm.','$2,015',0]])+
+      '<div class="dlabel" style="margin-top:14px">Teams this week</div><div class="dcard">'+rowHtml("Dom's Team",'5 closes','$1,701')+rowHtml("Jake's Team",'3 closes','$672')+'</div>'+
+      '<div class="dlabel">Latest closes</div><div class="dcard">'+rowHtml('M. Russo','House Wash · Dom','$499')+rowHtml('K. Patel','House Wash · Sara','$409')+rowHtml('B. Coleman','Driveway · Leo','$289')+'</div>';
+    }else if(role==='leader'){
+      S.innerHTML='<button class="gbtn" onclick="GO(\'log\')">⚡ Log a job</button><div style="height:12px"></div>'+
+      grid([['Team rev (wk)','$1,701',0],['Team closes','5',0],['My override','$34.02',1],['My commission','$59.88',1]])+
+      '<div class="dlabel" style="margin-top:14px">My reps</div><div class="dcard">'+repRow('Mike','2 closes','$519')+repRow('Sara','2 closes','$573')+'</div>';
+    }else{
+      S.innerHTML='<button class="gbtn" onclick="GO(\'log\')">⚡ Log a job</button><div style="height:12px"></div>'+
+      grid([['My closes (wk)','2',0],['My revenue','$519',0],['My commission','$51.90',1],['Avg ticket','$260',0]])+
+      '<div class="dlabel" style="margin-top:14px">My recent closes</div><div class="dcard">'+rowHtml('R. Alvarez','House Wash · just now','$300')+rowHtml('T. Brooks','Driveway · 1d ago','$219')+'</div>';
+    }
+  }
+  function log(){
+    var total=job.reduce(function(s,j){return s+j.p;},0);
+    var rate=role==='leader'?0.12:0.10,comm=Math.round(total*rate*100)/100;
+    var h='<div class="warn">Reminder: oil stains are NOT guaranteed to come out.</div>';
+    h+='<div class="dcard"><div class="dlabel">Quote calculator</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:11px">';
+    Object.keys(pricing).forEach(function(s){h+='<button class="pbtn'+(svc===s?' on':'')+'" onclick="PICK(\''+s+'\')">'+s+'</button>';});
+    h+='</div>';
+    pricing[svc].forEach(function(t,i){h+='<button class="lbtn" onclick="ADD('+i+')"><span>'+t[0]+'</span><span style="color:#4ade80">'+money(t[1])+' &nbsp;+</span></button>';});
+    h+='</div>';
+    if(job.length){
+      h+='<div class="dcard"><div class="dlabel">This job</div>';
+      job.forEach(function(j,i){h+='<div class="drow"><div><div class="nm" style="font-size:13px">'+j.s+'</div><div class="mt">'+j.t+'</div></div><div class="amt">'+money(j.p)+'</div><button onclick="DEL('+i+')" style="background:none;border:none;color:#f0997b;font-size:11px;margin-left:8px;cursor:pointer">remove</button></div>';});
+      h+='<div class="drow" style="border-top:1px solid #284536"><div class="nm">Total</div><div class="amt" style="font-size:19px">'+money(total)+'</div></div>';
+      h+='<div style="font-size:12px;color:#9bb3a7;margin-top:9px">Your commission: <b style="color:#4ade80">'+money(comm)+'</b>'+(role!=='leader'?' · leader override '+money(total*0.02):'')+'</div></div>';
+      h+='<div class="dcard"><div class="dlabel">Customer</div><input class="f" placeholder="Customer name" value="'+cust+'" oninput="CUST(this.value)"><input class="f" placeholder="123 Maple St"></div>';
+    }
+    h+='<button class="gbtn" '+(total?'':'disabled')+' onclick="SUBMIT()">'+(total?'Submit job — '+money(total):'Add a service to start')+'</button>';
+    S.innerHTML=h;
+  }
+  function win(){
+    var rate=role==='leader'?0.12:0.10;
+    S.innerHTML='<div class="dcard" style="text-align:center;padding:28px"><div style="width:56px;height:56px;border-radius:50%;background:rgba(74,222,128,.15);color:#4ade80;display:flex;align-items:center;justify-content:center;margin:0 auto 13px;font-size:28px">✓</div><div style="font-size:21px;font-weight:600">'+money(lastWin)+' closed</div><div style="font-size:13px;color:#9bb3a7;margin-top:9px;line-height:1.5">You earned <b style="color:#4ade80">'+money(lastWin*rate)+'</b> commission.<br>Posted to #wins · pushed to scheduling.</div><div style="display:flex;gap:9px;margin-top:20px"><button class="lbtn" style="justify-content:center;margin:0" onclick="AGAIN()">Log another</button><button class="gbtn" onclick="GO(\'home\')">Done</button></div></div>';
+  }
+  function ranks(){
+    var sorted=board.slice().sort(function(a,b){return b.rev-a.rev;});
+    var h='<div style="display:flex;gap:6px;margin-bottom:13px"><button class="pbtn">Day</button><button class="pbtn on">Week</button><button class="pbtn">Month</button></div><div class="dcard">';
+    sorted.forEach(function(r,i){h+='<div class="drow"><div class="rank'+(i<3?' t':'')+'">'+(i+1)+'</div><div class="av">'+ini(r.n)+'</div><div><div class="nm">'+r.n+'</div><div class="mt">'+r.r+' · '+r.cl+' closes</div></div><div class="amt">'+m0(r.rev)+'</div></div>';});
+    h+='</div><div style="font-size:11px;color:#6f8a7d;text-align:center;margin-top:13px">Earn your spot. Owners set the rules &amp; prizes.</div>';
+    S.innerHTML=h;
+  }
+  function map(){
+    var houses=['102','104','106','108','110','112','114','116'],who=role==='leader'?'Dom':role==='owner'?'Dylan':'Mike';
+    var h='<div class="dcard"><div class="dlabel">Maple Heights · Maple St</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">';
+    houses.forEach(function(x){var st=knock[x]||'nk',m=kmeta[st];h+='<button class="house" style="background:'+m[0]+';color:'+m[1]+'" onclick="KNOCK(\''+x+'\')">'+x+(st!=='nk'?'<span style="font-size:8px;font-weight:500;margin-top:2px">'+who+'</span>':'')+'</button>';});
+    h+='</div><div style="font-size:11px;color:#9bb3a7;margin-top:10px">Tap a house to log a knock — syncs to the whole team instantly.</div></div>';
+    h+='<div class="dcard"><div class="dlabel">Legend</div><div style="display:flex;flex-wrap:wrap;gap:8px 13px;font-size:11px">';
+    [['nk','Not knocked'],['na','No answer'],['ni','Not interested'],['fu','Follow-up'],['cl','Closed']].forEach(function(x){h+='<span style="display:flex;align-items:center;gap:5px"><span style="width:11px;height:11px;border-radius:3px;background:'+kmeta[x[0]][0]+'"></span>'+x[1]+'</span>';});
+    h+='</div></div>';
+    S.innerHTML=h;
+  }
+  window.GO=function(s){lastWin=null;screen=s;render();};
+  window.PICK=function(s){svc=s;log();};
+  window.ADD=function(i){var t=pricing[svc][i];job.push({s:svc,t:t[0],p:t[1]});log();};
+  window.DEL=function(i){job.splice(i,1);log();};
+  window.CUST=function(v){cust=v;};
+  window.SUBMIT=function(){var total=job.reduce(function(s,j){return s+j.p;},0);if(!total)return;lastWin=total;var mine=board.find(function(b){return b.n===(role==='leader'?'Dom':'Mike');});if(mine){mine.rev+=total;mine.cl++;}job=[];cust='';render();};
+  window.AGAIN=function(){lastWin=null;job=[];cust='';log();};
+  window.KNOCK=function(x){var cur=knock[x]||'nk';knock[x]=korder[(korder.indexOf(cur)+1)%korder.length];map();};
+  document.querySelectorAll('.nav').forEach(function(b){b.onclick=function(){GO(b.dataset.s);};});
+  ROLE.onchange=function(){role=ROLE.value;lastWin=null;job=[];cust='';screen='home';render();};
+  render();
+})();
+</script>
+</body>
+</html>
